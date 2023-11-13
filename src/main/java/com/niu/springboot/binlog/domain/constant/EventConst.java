@@ -6,6 +6,9 @@ import com.google.common.collect.Lists;
 import java.math.BigDecimal;
 import java.util.List;
 
+/**
+ * @author genlot
+ */
 public class EventConst {
 
     /**

@@ -3,6 +3,7 @@ package com.niu.springboot.binlog.domain.dto;
 import com.github.shyiko.mysql.binlog.event.EventType;
 import com.google.common.collect.Lists;
 import com.niu.springboot.binlog.domain.constant.EventConst;
+import com.niu.springboot.binlog.domain.po.TSyncMapping;
 import lombok.Data;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
@@ -12,14 +13,13 @@ import java.text.MessageFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 
 /**
  * Binlog 数据
  *
- * @author [nza]
- * @version 1.0 [2020/12/21 11:21]
- * @createTime [2020/12/21 11:21]
+ * @author genlot
  */
 @Data
 @Accessors(chain = true)
@@ -123,20 +123,18 @@ public class BinlogRowDataBO {
      * 获取SQL
      *
      * @return {@link java.lang.String}
-     * @author nza
-     * @createTime 2020/12/23 11:27
      */
-    public List<String> getSql(String targetTable) {
+    public List<String> getSql(List<TSyncMapping> mappingList) {
         List<String> sqlList = Lists.newArrayList();
         switch (eventType) {
             case EXT_WRITE_ROWS:
-                handleWriteRows(sqlList, targetTable);
+                handleWriteRows(sqlList, mappingList);
                 break;
             case EXT_UPDATE_ROWS:
-                handleUpdateRows(sqlList, targetTable);
+                handleUpdateRows(sqlList, mappingList);
                 break;
             case EXT_DELETE_ROWS:
-                handleDeleteRows(sqlList, targetTable);
+                handleDeleteRows(sqlList, mappingList);
                 break;
             default:
                 return null;
@@ -149,10 +147,9 @@ public class BinlogRowDataBO {
      * 处理删除行
      *
      * @param sqlLists 列表
-     * @author nza
-     * @createTime 2020/12/23 11:53
      */
-    private void handleDeleteRows(List<String> sqlLists, String targetTable) {
+    private void handleDeleteRows(List<String> sqlLists, List<TSyncMapping> mappingList) {
+        String targetTable ="";
         for (Map<String, String> map : after) {
 
             List<String> wheres = Lists.newArrayList();
@@ -173,10 +170,9 @@ public class BinlogRowDataBO {
      * 处理更新行
      *
      * @param sqlLists 列表
-     * @author nza
-     * @createTime 2020/12/23 11:53
      */
-    private void handleUpdateRows(List<String> sqlLists, String targetTable) {
+    private void handleUpdateRows(List<String> sqlLists, List<TSyncMapping> mappingList) {
+        String targetTable ="";
         for (int i = 0; i < after.size(); i++) {
 
             List<String> updates = Lists.newArrayList();
@@ -211,16 +207,15 @@ public class BinlogRowDataBO {
      * 处理插入行
      *
      * @param sqlLists 列表
-     * @author nza
-     * @createTime 2020/12/23 11:53
      */
-    private void handleWriteRows(List<String> sqlLists, String targetTable) {
+    private void handleWriteRows(List<String> sqlLists, List<TSyncMapping> mappingList) {
+        String targetTable ="";
         for (Map<String, String> map : after) {
             List<String> columns = Lists.newArrayList();
             List<String> values = Lists.newArrayList();
 
             map.forEach((column, value) -> {
-                if(Objects.isNull(value)) {
+                if (Objects.isNull(value)) {
                     return;
                 }
                 columns.add(MessageFormat.format(BACK_QUOTE_TEMPLATE, column));
@@ -238,12 +233,11 @@ public class BinlogRowDataBO {
     /**
      * 校验是否可以收集
      *
-     * @param type 事件类型
+     * @param allowCollectionSchemas 数据库白名单
+     * @param allowCollectionTables  数据库表白名单
      * @return boolean true 可以 false 不可以
-     * @author nza
-     * @createTime 2020/12/21 14:34
      */
-    public boolean canCollection(List<String> allowCollectionSchemas, List<String> allowCollectionTables) {
+    public boolean canCollection(Set<String> allowCollectionSchemas, Set<String> allowCollectionTables) {
         // 如果不是更新、插入、删除事件, 直接忽略即可
         if (!EventConst.ALLOW_COLLECTION_TYPES.contains(this.getEventType())) {
             return false;

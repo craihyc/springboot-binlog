@@ -6,9 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * 自定义 Mysql 配置类
  *
- * @author [nza]
- * @version 1.0 [2020/12/21 11:27]
- * @createTime [2020/12/21 11:27]
+ * @author genlot
  */
 @ConfigurationProperties(prefix = "mysql-binlog-connect-java.datasource")
 @Data

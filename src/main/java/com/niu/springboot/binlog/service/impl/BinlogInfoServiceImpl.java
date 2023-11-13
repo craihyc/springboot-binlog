@@ -11,9 +11,7 @@ import org.springframework.stereotype.Service;
 /**
  * binlog 详情实现类
  *
- * @author [nza]
- * @version 1.0 [2020/12/24 10:02]
- * @createTime [2020/12/24 10:02]
+ * @author genlot
  */
 @Service
 @Slf4j

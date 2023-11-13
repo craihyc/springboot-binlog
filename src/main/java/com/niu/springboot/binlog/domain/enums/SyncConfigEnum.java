@@ -1,12 +1,13 @@
 package com.niu.springboot.binlog.domain.enums;
 
+import lombok.Getter;
+
 /**
  * 系统字典枚举
  *
- * @author [nza]
- * @version 1.0 [2020/12/23 14:59]
- * @createTime [2020/12/23 14:59]
+ * @author genlot
  */
+@Getter
 public enum SyncConfigEnum {
 
     /**
@@ -24,11 +25,4 @@ public enum SyncConfigEnum {
 
     private final String des;
 
-    public String getKey() {
-        return key;
-    }
-
-    public String getDes() {
-        return des;
-    }
 }

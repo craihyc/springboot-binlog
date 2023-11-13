@@ -12,12 +12,11 @@ import java.util.List;
 /**
  * 系统字典业务实现类
  *
- * @author [nza]
- * @version 1.0 [2020/12/23 14:53]
- * @createTime [2020/12/23 14:53]
+ * @author genlot
  */
 @Service
 @AllArgsConstructor
+@SuppressWarnings("all")
 public class SyncConfigServiceImpl implements SyncConfigService {
 
     private final JdbcTemplate jdbcTemplate;
@@ -25,12 +24,12 @@ public class SyncConfigServiceImpl implements SyncConfigService {
     /**
      * 更新SQL模板
      */
-    private static final String UPDATE_SQL_TEMPLATE = "UPDATE `t_sync_record` SET `value` = ''{0}'' WHERE `key` = ''{1}''";
+    private static final String UPDATE_SQL_TEMPLATE = "UPDATE `t_sync_config` SET `value` = ''{0}'' WHERE `key` = ''{1}''";
 
     /**
      * 查询SQL模板
      */
-    private static final String SELECT_SQL_TEMPLATE = "SELECT `value` FROM `t_sync_record` WHERE `key` = ?";
+    private static final String SELECT_SQL_TEMPLATE = "SELECT `value` FROM `t_sync_config` WHERE `key` = ?";
 
     @Override
     public void updateByKey(SyncConfigEnum key, String val) {

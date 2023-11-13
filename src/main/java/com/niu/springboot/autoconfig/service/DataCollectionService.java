@@ -8,9 +8,6 @@ import java.util.Map;
 /**
  * 数据收集业务类
  *
- * @author [nza]
- * @version 1.0 [2020/12/21 11:13]
- * @createTime [2020/12/21 11:13]
  */
 public interface DataCollectionService {
 
@@ -18,8 +15,6 @@ public interface DataCollectionService {
      * 收集增量数据
      *
      * @param event binlog 事件
-     * @author nza
-     * @createTime 2020/12/21 11:18
      */
     void collectionIncrementalData(Event event);
 
@@ -29,8 +24,6 @@ public interface DataCollectionService {
      * @param schema    数据库名
      * @param tableName 表名
      * @return {@link java.util.Map<java.lang.Integer,java.lang.String>}
-     * @author nza
-     * @createTime 2020/12/21 13:41
      */
     Map<Integer, String> getDbPosMap(String schema, String tableName);
 
@@ -40,8 +33,6 @@ public interface DataCollectionService {
      * @param schema    数据库名
      * @param tableName 表名
      * @return {@link java.util.Map<java.lang.Integer,java.lang.String>}
-     * @author nza
-     * @createTime 2020/12/21 13:41
      */
     List<String> getPrimaryKeys(String schema, String tableName);
 }

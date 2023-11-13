@@ -7,13 +7,15 @@ import com.niu.springboot.autoconfig.service.DataCollectionService;
 import com.niu.springboot.binlog.domain.constant.EventConst;
 import com.niu.springboot.binlog.domain.dto.BinlogRowDataBO;
 import com.niu.springboot.binlog.domain.enums.SyncConfigEnum;
+import com.niu.springboot.binlog.domain.po.TSyncMapping;
 import com.niu.springboot.binlog.service.SyncConfigService;
+import com.niu.springboot.binlog.service.SyncMappingService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
 import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -21,40 +23,24 @@ import java.util.*;
 /**
  * 数据收集业务实现类
  *
- * @author [nza]
- * @version 1.0 [2020/12/21 11:14]
- * @createTime [2020/12/21 11:14]
+ * @author genlot
  */
 @Service
 @Slf4j
 public class DataCollectionServiceImpl implements DataCollectionService {
 
-
-    @Autowired
+    @Resource
     private JdbcTemplate jdbcTemplate;
-
-    @Autowired
+    @Resource
     private SyncConfigService syncConfigService;
+    @Resource
+    private SyncMappingService syncMappingService;
 
-    /**
-     * 允许收集的数据库
-     */
-    private static final List<String> ALLOW_COLLECTION_SCHEMAS;
-
-    /**
-     * 允许收集的数据库表
-     */
-    private static final List<String> ALLOW_COLLECTION_TABLES;
 
     /**
      * binlog文件是否变化
      */
     private Boolean isBinlogChanged = false;
-
-    static {
-        ALLOW_COLLECTION_SCHEMAS = Lists.newArrayList("test");
-        ALLOW_COLLECTION_TABLES = Lists.newArrayList("sys_config");
-    }
 
     @Override
     public void collectionIncrementalData(Event event) {
@@ -71,7 +57,7 @@ public class DataCollectionServiceImpl implements DataCollectionService {
         BinlogRowDataBO rowData = initRowData(event, type);
 
         // 判断是否可以收集
-        if (!rowData.canCollection(ALLOW_COLLECTION_SCHEMAS, ALLOW_COLLECTION_TABLES)) {
+        if (!rowData.canCollection(syncMappingService.getAllowSchemeList(), syncMappingService.getAllowTableList())) {
             return;
         }
 
@@ -86,8 +72,6 @@ public class DataCollectionServiceImpl implements DataCollectionService {
      * @param type  事件类型
      * @param event binlog事件
      * @return boolean
-     * @author nza
-     * @createTime 2020/12/22 14:13
      */
     private synchronized boolean handleBinlogFileChange(EventType type, Event event) {
         if (EventType.ROTATE.equals(type)) {
@@ -114,13 +98,10 @@ public class DataCollectionServiceImpl implements DataCollectionService {
     }
 
     /**
-     * 执行收集逻辑
+     * 执行收集逻辑 {@link Exception} 收集失败抛出
      *
      * @param event   binlog 事件
      * @param rowData 上下文
-     * @throws {@link Exception} 收集失败抛出
-     * @author nza
-     * @createTime 2020/12/21 14:36
      */
     private void doCollection(Event event, BinlogRowDataBO rowData) {
         try {
@@ -128,7 +109,7 @@ public class DataCollectionServiceImpl implements DataCollectionService {
             Map<Integer, String> dbPosMap = getDbPosMap(rowData.getSchemaName(), rowData.getTableName());
 
             // 构造 BinlogRowData 对象
-            rowData = buildRowData(event.getData(), rowData, dbPosMap);
+            buildRowData(event.getData(), rowData, dbPosMap);
             rowData.setNextPosition(((EventHeaderV4) event.getHeader()).getNextPosition());
             rowData.setCurPosition(((EventHeaderV4) event.getHeader()).getPosition());
 
@@ -147,12 +128,11 @@ public class DataCollectionServiceImpl implements DataCollectionService {
      * 将数据变动同步到备份表
      *
      * @param rowData 源数据
-     * @author nza
-     * @createTime 2020/12/23 14:33
      */
     private void doBackup(BinlogRowDataBO rowData) {
-        String table = "sys_config_copy";
-        for (String sql : rowData.getSql(table)) {
+        // 根据原库、表查询目标库、表及其映射字段
+        List<TSyncMapping> list = syncMappingService.listBySchemeAndTableName(rowData.getOriginDataBase(), rowData.getOriginTableName());
+        for (String sql : rowData.getSql(list)) {
             int res = jdbcTemplate.update(sql);
             log.info("同步完成, 影响行: {}", res);
         }
@@ -166,11 +146,8 @@ public class DataCollectionServiceImpl implements DataCollectionService {
      * 构建行数据
      *
      * @param data 事件
-     * @return {@link BinlogRowDataBO} 行数据
-     * @author nza
-     * @createTime 2020/12/21 14:28
      */
-    private BinlogRowDataBO buildRowData(EventData data, BinlogRowDataBO rowDataBO, Map<Integer, String> dbPosMap) throws Exception {
+    private void buildRowData(EventData data, BinlogRowDataBO rowDataBO, Map<Integer, String> dbPosMap) throws Exception {
 
         List<String> primaryKeys = getPrimaryKeys(rowDataBO.getSchemaName(), rowDataBO.getTableName());
         List<Map<String, String>> after = Lists.newArrayList();
@@ -193,8 +170,6 @@ public class DataCollectionServiceImpl implements DataCollectionService {
         rowDataBO.setPrimaryKeys(primaryKeys)
                 .setAfter(after)
                 .setBefore(before);
-
-        return rowDataBO;
     }
 
     /**
@@ -203,8 +178,6 @@ public class DataCollectionServiceImpl implements DataCollectionService {
      * @param data     binlog 源数据
      * @param dbPosMap 表映射
      * @param after    变更后的数据
-     * @author nza
-     * @createTime 2020/12/21 17:31
      */
     private void processDeleteRows(DeleteRowsEventData data, Map<Integer, String> dbPosMap, List<Map<String, String>> after) {
         BitSet columns = data.getIncludedColumns();
@@ -218,8 +191,6 @@ public class DataCollectionServiceImpl implements DataCollectionService {
      * @param data     binlog 数据
      * @param dbPosMap 数据库映射
      * @param after    变更后的数据
-     * @author nza
-     * @createTime 2020/12/21 17:11
      */
     private void processWriteRows(WriteRowsEventData data, Map<Integer, String> dbPosMap, List<Map<String, String>> after) {
         BitSet columns = data.getIncludedColumns();
@@ -234,8 +205,6 @@ public class DataCollectionServiceImpl implements DataCollectionService {
      * @param rowList  行数据列表
      * @param columns  行信息
      * @param rows     需要转换的binlog源数据
-     * @author nza
-     * @createTime 2020/12/21 17:20
      */
     private void addRowData(Map<Integer, String> dbPosMap, List<Map<String, String>> rowList, BitSet columns, List<Serializable[]> rows) {
         for (Serializable[] row : rows) {
@@ -255,8 +224,6 @@ public class DataCollectionServiceImpl implements DataCollectionService {
      *
      * @param item 参数
      * @return {@link java.lang.String}
-     * @author nza
-     * @createTime 2020/12/22 13:21
      */
     private String convert2SqlStr(Object item) {
         if (item == null) {
@@ -281,8 +248,6 @@ public class DataCollectionServiceImpl implements DataCollectionService {
      * @param dbPosMap 数据库字段映射
      * @param after    变更前
      * @param before   变更后
-     * @author nza
-     * @createTime 2020/12/21 16:45
      */
     private void processUpdateRows(UpdateRowsEventData data, Map<Integer, String> dbPosMap, List<Map<String, String>> after, List<Map<String, String>> before) {
         BitSet columns = data.getIncludedColumns();
@@ -302,8 +267,6 @@ public class DataCollectionServiceImpl implements DataCollectionService {
      *
      * @param event 事件
      * @param type  类型
-     * @author nza
-     * @createTime 2020/12/21 14:26
      */
     private BinlogRowDataBO initRowData(Event event, EventType type) {
         // 如果是 TABLE_MAP 事件，可以从中获取到操作的库名和表名

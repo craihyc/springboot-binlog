@@ -1,18 +1,3 @@
-/*
-Navicat MySQL Data Transfer
-
-Source Server         : localhost
-Source Server Version : 50645
-Source Host           : localhost:3306
-Source Database       : test
-
-Target Server Type    : MYSQL
-Target Server Version : 50645
-File Encoding         : 65001
-
-Date: 2020-12-24 10:49:56
-*/
-
 SET FOREIGN_KEY_CHECKS=0;
 
 -- ----------------------------
@@ -50,10 +35,10 @@ CREATE TABLE `sys_config_copy` (
 -- ----------------------------
 
 -- ----------------------------
--- Table structure for t_sync_record
+-- Table structure for t_sync_config
 -- ----------------------------
-DROP TABLE IF EXISTS `t_sync_record`;
-CREATE TABLE `t_sync_record` (
+DROP TABLE IF EXISTS `t_sync_config`;
+CREATE TABLE `t_sync_config` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '主键',
   `key` varchar(30) CHARACTER SET utf8 NOT NULL COMMENT '键值',
   `value` varchar(100) CHARACTER SET utf8 NOT NULL COMMENT '值',
@@ -62,7 +47,7 @@ CREATE TABLE `t_sync_record` (
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=latin1;
 
 -- ----------------------------
--- Records of t_sync_record
+-- Records of t_sync_config
 -- ----------------------------
-INSERT INTO `t_sync_record` VALUES ('1', 'BIN_LOG_FILE_NAME', '');
-INSERT INTO `t_sync_record` VALUES ('2', 'BIN_LOG_NEXT_POSITION', '');
+INSERT INTO `t_sync_config` VALUES ('1', 'BIN_LOG_FILE_NAME', '');
+INSERT INTO `t_sync_config` VALUES ('2', 'BIN_LOG_NEXT_POSITION', '');

@@ -2,8 +2,8 @@ package com.niu.springboot.autoconfig;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
-import com.niu.springboot.autoconfig.service.BinlogInfoService;
 import com.niu.springboot.autoconfig.properties.MySqlBinlogConnectJavaProperties;
+import com.niu.springboot.autoconfig.service.BinlogInfoService;
 import com.niu.springboot.autoconfig.service.DataCollectionService;
 import lombok.AllArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -21,9 +21,7 @@ import java.io.IOException;
 /**
  * mysql-binlog-connector-java 配置类
  *
- * @author [nza]
- * @version 1.0 [2020/12/21 11:29]
- * @createTime [2020/12/21 11:29]
+ * @author genlot
  */
 @Configuration
 @EnableConfigurationProperties({MySqlBinlogConnectJavaProperties.class})
@@ -78,9 +76,7 @@ public class MySqlBinlogConnectJavaAutoConfiguration {
     /**
      * 获取事件序列化规则
      *
-     * @return {@link com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer}
-     * @author nza
-     * @createTime 2020/12/21 13:28
+     * @return {@link EventDeserializer}
      */
     private EventDeserializer getEventDeserializer() {
         EventDeserializer eventDeserializer;
