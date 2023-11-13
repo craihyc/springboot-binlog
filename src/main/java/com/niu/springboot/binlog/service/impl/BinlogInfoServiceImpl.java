@@ -1,8 +1,8 @@
 package com.niu.springboot.binlog.service.impl;
 
 import com.niu.springboot.autoconfig.service.BinlogInfoService;
-import com.niu.springboot.binlog.domain.enums.SysDictionaryEnum;
-import com.niu.springboot.binlog.service.SysDictionaryService;
+import com.niu.springboot.binlog.domain.enums.SyncConfigEnum;
+import com.niu.springboot.binlog.service.SyncConfigService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -21,11 +21,11 @@ import org.springframework.stereotype.Service;
 public class BinlogInfoServiceImpl implements BinlogInfoService {
 
 
-    private final SysDictionaryService sysDictionaryService;
+    private final SyncConfigService syncConfigService;
 
     @Override
     public String getBinlogFileName(Object... param) {
-        String filename = sysDictionaryService.getValByKey(SysDictionaryEnum.BIN_LOG_FILE_NAME);
+        String filename = syncConfigService.getValByKey(SyncConfigEnum.BIN_LOG_FILE_NAME);
         if (StringUtils.isEmpty(filename)) {
             return null;
         }
@@ -34,7 +34,7 @@ public class BinlogInfoServiceImpl implements BinlogInfoService {
 
     @Override
     public Long getBinlogNextPosition(Object... param) {
-        String position = sysDictionaryService.getValByKey(SysDictionaryEnum.BIN_LOG_NEXT_POSITION);
+        String position = syncConfigService.getValByKey(SyncConfigEnum.BIN_LOG_NEXT_POSITION);
         if (StringUtils.isEmpty(position)) {
             return null;
         }

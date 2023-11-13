@@ -1,9 +1,8 @@
 package com.niu.springboot.binlog.service.impl;
 
-import com.niu.springboot.binlog.domain.enums.SysDictionaryEnum;
-import com.niu.springboot.binlog.service.SysDictionaryService;
+import com.niu.springboot.binlog.domain.enums.SyncConfigEnum;
+import com.niu.springboot.binlog.service.SyncConfigService;
 import lombok.AllArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -19,28 +18,28 @@ import java.util.List;
  */
 @Service
 @AllArgsConstructor
-public class SysDictionaryServiceImpl implements SysDictionaryService {
+public class SyncConfigServiceImpl implements SyncConfigService {
 
     private final JdbcTemplate jdbcTemplate;
 
     /**
      * 更新SQL模板
      */
-    private static final String UPDATE_SQL_TEMPLATE = "UPDATE `sys_dictionary` SET `value` = ''{0}'' WHERE `key` = ''{1}''";
+    private static final String UPDATE_SQL_TEMPLATE = "UPDATE `t_sync_record` SET `value` = ''{0}'' WHERE `key` = ''{1}''";
 
     /**
      * 查询SQL模板
      */
-    private static final String SELECT_SQL_TEMPLATE = "SELECT `value` FROM `sys_dictionary` WHERE `key` = ?";
+    private static final String SELECT_SQL_TEMPLATE = "SELECT `value` FROM `t_sync_record` WHERE `key` = ?";
 
     @Override
-    public void updateByKey(SysDictionaryEnum key, String val) {
+    public void updateByKey(SyncConfigEnum key, String val) {
         String sql = MessageFormat.format(UPDATE_SQL_TEMPLATE, val, key.getKey());
         jdbcTemplate.update(sql);
     }
 
     @Override
-    public String getValByKey(SysDictionaryEnum key) {
+    public String getValByKey(SyncConfigEnum key) {
         String sql = MessageFormat.format(SELECT_SQL_TEMPLATE, key.getKey());
         List<String> res = jdbcTemplate.query(sql,
                 new String[]{key.getKey()},

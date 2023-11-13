@@ -2,13 +2,17 @@ package com.niu.springboot.binlog.domain.dto;
 
 import com.github.shyiko.mysql.binlog.event.EventType;
 import com.google.common.collect.Lists;
+import com.niu.springboot.binlog.domain.constant.EventConst;
 import lombok.Data;
 import lombok.experimental.Accessors;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
 import java.text.MessageFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+
 
 /**
  * Binlog 数据
@@ -19,7 +23,8 @@ import java.util.Map;
  */
 @Data
 @Accessors(chain = true)
-public class BinlogRowDataDTO {
+@Slf4j
+public class BinlogRowDataBO {
 
     /**
      * 插入SQL模板
@@ -71,6 +76,18 @@ public class BinlogRowDataDTO {
      */
     private String tableName;
 
+
+    /**
+     * 数据库名
+     */
+    private String originDataBase;
+
+    /**
+     * 表名
+     */
+    private String originTableName;
+
+
     /**
      * 当前记录的位置
      */
@@ -100,6 +117,7 @@ public class BinlogRowDataDTO {
      * 更新之前的数据，对于插入类型来说，即为空
      */
     private List<Map<String, String>> before;
+
 
     /**
      * 获取SQL
@@ -202,6 +220,9 @@ public class BinlogRowDataDTO {
             List<String> values = Lists.newArrayList();
 
             map.forEach((column, value) -> {
+                if(Objects.isNull(value)) {
+                    return;
+                }
                 columns.add(MessageFormat.format(BACK_QUOTE_TEMPLATE, column));
                 values.add(MessageFormat.format(SINGLE_QUOTE_TEMPLATE, value));
             });
@@ -212,5 +233,34 @@ public class BinlogRowDataDTO {
             String sql = MessageFormat.format(INSTAR_SQL_TEMPLATE, table, column, value);
             sqlLists.add(sql);
         }
+    }
+
+    /**
+     * 校验是否可以收集
+     *
+     * @param type 事件类型
+     * @return boolean true 可以 false 不可以
+     * @author nza
+     * @createTime 2020/12/21 14:34
+     */
+    public boolean canCollection(List<String> allowCollectionSchemas, List<String> allowCollectionTables) {
+        // 如果不是更新、插入、删除事件, 直接忽略即可
+        if (!EventConst.ALLOW_COLLECTION_TYPES.contains(this.getEventType())) {
+            return false;
+        }
+
+        // 表名和库名是否已经完成填充
+        if (StringUtils.isEmpty(this.originDataBase) || StringUtils.isEmpty(this.originTableName)) {
+            log.warn("no meta data event");
+            return false;
+        }
+
+        // 是否在数据库白名单中
+        if (!allowCollectionSchemas.contains(this.originDataBase)) {
+            return false;
+        }
+
+        // 是否在数据库表白名单中
+        return allowCollectionTables.contains(this.originTableName);
     }
 }

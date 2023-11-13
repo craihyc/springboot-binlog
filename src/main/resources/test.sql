@@ -50,10 +50,10 @@ CREATE TABLE `sys_config_copy` (
 -- ----------------------------
 
 -- ----------------------------
--- Table structure for sys_dictionary
+-- Table structure for t_sync_record
 -- ----------------------------
-DROP TABLE IF EXISTS `sys_dictionary`;
-CREATE TABLE `sys_dictionary` (
+DROP TABLE IF EXISTS `t_sync_record`;
+CREATE TABLE `t_sync_record` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT '主键',
   `key` varchar(30) CHARACTER SET utf8 NOT NULL COMMENT '键值',
   `value` varchar(100) CHARACTER SET utf8 NOT NULL COMMENT '值',
@@ -62,7 +62,7 @@ CREATE TABLE `sys_dictionary` (
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=latin1;
 
 -- ----------------------------
--- Records of sys_dictionary
+-- Records of t_sync_record
 -- ----------------------------
-INSERT INTO `sys_dictionary` VALUES ('1', 'BIN_LOG_FILE_NAME', '');
-INSERT INTO `sys_dictionary` VALUES ('2', 'BIN_LOG_NEXT_POSITION', '');
+INSERT INTO `t_sync_record` VALUES ('1', 'BIN_LOG_FILE_NAME', '');
+INSERT INTO `t_sync_record` VALUES ('2', 'BIN_LOG_NEXT_POSITION', '');

@@ -7,7 +7,7 @@ package com.niu.springboot.binlog.domain.enums;
  * @version 1.0 [2020/12/23 14:59]
  * @createTime [2020/12/23 14:59]
  */
-public enum SysDictionaryEnum {
+public enum SyncConfigEnum {
 
     /**
      * 枚举
@@ -15,7 +15,7 @@ public enum SysDictionaryEnum {
     BIN_LOG_FILE_NAME("BIN_LOG_FILE_NAME", "binlog文件名"),
     BIN_LOG_NEXT_POSITION("BIN_LOG_NEXT_POSITION", "binlog读取位置");
 
-    SysDictionaryEnum(String key, String des) {
+    SyncConfigEnum(String key, String des) {
         this.key = key;
         this.des = des;
     }

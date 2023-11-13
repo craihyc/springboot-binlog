@@ -1,6 +1,6 @@
 package com.niu.springboot.binlog.service;
 
-import com.niu.springboot.binlog.domain.enums.SysDictionaryEnum;
+import com.niu.springboot.binlog.domain.enums.SyncConfigEnum;
 
 /**
  * 系统字典业务类
@@ -9,7 +9,7 @@ import com.niu.springboot.binlog.domain.enums.SysDictionaryEnum;
  * @version 1.0 [2020/12/23 14:52]
  * @createTime [2020/12/23 14:52]
  */
-public interface SysDictionaryService {
+public interface SyncConfigService {
 
     /**
      * 根据Key更新值
@@ -19,7 +19,7 @@ public interface SysDictionaryService {
      * @author nza
      * @createTime 2020/12/23 14:55
      */
-    void updateByKey(SysDictionaryEnum key, String val);
+    void updateByKey(SyncConfigEnum key, String val);
 
     /**
      * 根据Key获取值
@@ -29,5 +29,5 @@ public interface SysDictionaryService {
      * @author nza
      * @createTime 2020/12/23 14:55
      */
-    String getValByKey(SysDictionaryEnum key);
+    String getValByKey(SyncConfigEnum key);
 }

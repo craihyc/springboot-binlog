@@ -4,9 +4,10 @@ import com.github.shyiko.mysql.binlog.event.*;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.niu.springboot.autoconfig.service.DataCollectionService;
-import com.niu.springboot.binlog.domain.dto.BinlogRowDataDTO;
-import com.niu.springboot.binlog.domain.enums.SysDictionaryEnum;
-import com.niu.springboot.binlog.service.SysDictionaryService;
+import com.niu.springboot.binlog.domain.constant.EventConst;
+import com.niu.springboot.binlog.domain.dto.BinlogRowDataBO;
+import com.niu.springboot.binlog.domain.enums.SyncConfigEnum;
+import com.niu.springboot.binlog.service.SyncConfigService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +15,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.Serializable;
-import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -29,31 +29,12 @@ import java.util.*;
 @Slf4j
 public class DataCollectionServiceImpl implements DataCollectionService {
 
-    /**
-     * 可以直接转字符串的类型
-     */
-    private static final List<Class<?>> NORMAL_TYPE;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private SysDictionaryService sysDictionaryService;
-
-    /**
-     * 查询表信息
-     */
-    private static final String SQL_SCHEMA;
-
-    /**
-     * 查询表主键
-     */
-    private static final String SQL_PRIMARY_SCHEMA;
-
-    /**
-     * 允许收集的数据类型
-     */
-    private static final List<EventType> ALLOW_COLLECTION_TYPES;
+    private SyncConfigService syncConfigService;
 
     /**
      * 允许收集的数据库
@@ -66,35 +47,13 @@ public class DataCollectionServiceImpl implements DataCollectionService {
     private static final List<String> ALLOW_COLLECTION_TABLES;
 
     /**
-     * 表名
-     */
-    private String tableName = null;
-
-    /**
-     * 数据库名
-     */
-    private String dbName = null;
-
-    /**
-     * 数据库名
+     * binlog文件是否变化
      */
     private Boolean isBinlogChanged = false;
 
     static {
-        SQL_SCHEMA = "select table_schema, table_name, column_name, ordinal_position from information_schema.columns where table_schema = ? and table_name = ?";
-        SQL_PRIMARY_SCHEMA = "select column_name, column_key from information_schema.columns where table_schema = ? and table_name = ? and column_key = 'PRI'";
-        ALLOW_COLLECTION_TYPES = Lists.newArrayList(EventType.EXT_UPDATE_ROWS, EventType.EXT_WRITE_ROWS, EventType.EXT_DELETE_ROWS);
         ALLOW_COLLECTION_SCHEMAS = Lists.newArrayList("test");
         ALLOW_COLLECTION_TABLES = Lists.newArrayList("sys_config");
-        NORMAL_TYPE = Lists.newArrayList(byte.class, Byte.class,
-                short.class, Short.class,
-                int.class, Integer.class,
-                long.class, Long.class,
-                float.class, Float.class,
-                double.class, Double.class,
-                char.class, Character.class,
-                String.class,
-                BigDecimal.class);
     }
 
     @Override
@@ -108,17 +67,18 @@ public class DataCollectionServiceImpl implements DataCollectionService {
             return;
         }
 
-        // 设置表信息
-        optionTableInfo(event, type);
+        // 初始化RowData上下文,设置表信息
+        BinlogRowDataBO rowData = initRowData(event, type);
 
         // 判断是否可以收集
-        if (!canCollection(type)) {
+        if (!rowData.canCollection(ALLOW_COLLECTION_SCHEMAS, ALLOW_COLLECTION_TABLES)) {
             return;
         }
 
         // 执行收集逻辑
-        doCollection(event, type);
+        doCollection(event, rowData);
     }
+
 
     /**
      * 处理 binlog 文件切换事件
@@ -129,10 +89,10 @@ public class DataCollectionServiceImpl implements DataCollectionService {
      * @author nza
      * @createTime 2020/12/22 14:13
      */
-    private boolean handleBinlogFileChange(EventType type, Event event) {
+    private synchronized boolean handleBinlogFileChange(EventType type, Event event) {
         if (EventType.ROTATE.equals(type)) {
             // 更新 binlog 文件相关记录配置
-            String originalFile = sysDictionaryService.getValByKey(SysDictionaryEnum.BIN_LOG_FILE_NAME);
+            String originalFile = syncConfigService.getValByKey(SyncConfigEnum.BIN_LOG_FILE_NAME);
             String binlogFilename = ((RotateEventData) event.getData()).getBinlogFilename();
             // 如果文件未变化忽略即可
             if (StringUtils.equals(binlogFilename, originalFile)) {
@@ -140,13 +100,13 @@ public class DataCollectionServiceImpl implements DataCollectionService {
             }
 
             isBinlogChanged = true;
-            sysDictionaryService.updateByKey(SysDictionaryEnum.BIN_LOG_FILE_NAME, binlogFilename);
+            syncConfigService.updateByKey(SyncConfigEnum.BIN_LOG_FILE_NAME, binlogFilename);
             return true;
         }
         if (EventType.FORMAT_DESCRIPTION.equals(type) && isBinlogChanged) {
             // 更新 binlog 开始位置记录配置
             long nextPosition = ((EventHeaderV4) event.getHeader()).getNextPosition();
-            sysDictionaryService.updateByKey(SysDictionaryEnum.BIN_LOG_NEXT_POSITION, String.valueOf(nextPosition));
+            syncConfigService.updateByKey(SyncConfigEnum.BIN_LOG_NEXT_POSITION, String.valueOf(nextPosition));
             isBinlogChanged = false;
             return true;
         }
@@ -156,19 +116,19 @@ public class DataCollectionServiceImpl implements DataCollectionService {
     /**
      * 执行收集逻辑
      *
-     * @param event binlog 事件
-     * @param type  事件类型
+     * @param event   binlog 事件
+     * @param rowData 上下文
      * @throws {@link Exception} 收集失败抛出
      * @author nza
      * @createTime 2020/12/21 14:36
      */
-    private void doCollection(Event event, EventType type) {
+    private void doCollection(Event event, BinlogRowDataBO rowData) {
         try {
             // 查询表映射信息
-            Map<Integer, String> dbPosMap = getDbPosMap(dbName, tableName);
+            Map<Integer, String> dbPosMap = getDbPosMap(rowData.getSchemaName(), rowData.getTableName());
 
             // 构造 BinlogRowData 对象
-            BinlogRowDataDTO rowData = buildRowData(event.getData(), type, dbPosMap);
+            rowData = buildRowData(event.getData(), rowData, dbPosMap);
             rowData.setNextPosition(((EventHeaderV4) event.getHeader()).getNextPosition());
             rowData.setCurPosition(((EventHeaderV4) event.getHeader()).getPosition());
 
@@ -180,10 +140,6 @@ public class DataCollectionServiceImpl implements DataCollectionService {
 
         } catch (Exception ex) {
             log.error("收集增量数据发送异常, 异常信息: ", ex);
-        } finally {
-            // 重置库名和表名
-            this.dbName = null;
-            this.tableName = null;
         }
     }
 
@@ -194,7 +150,7 @@ public class DataCollectionServiceImpl implements DataCollectionService {
      * @author nza
      * @createTime 2020/12/23 14:33
      */
-    private void doBackup(BinlogRowDataDTO rowData) {
+    private void doBackup(BinlogRowDataBO rowData) {
         String table = "sys_config_copy";
         for (String sql : rowData.getSql(table)) {
             int res = jdbcTemplate.update(sql);
@@ -202,54 +158,25 @@ public class DataCollectionServiceImpl implements DataCollectionService {
         }
 
         // 更新配置表
-        sysDictionaryService.updateByKey(SysDictionaryEnum.BIN_LOG_NEXT_POSITION, String.valueOf(rowData.getNextPosition()));
+        syncConfigService.updateByKey(SyncConfigEnum.BIN_LOG_NEXT_POSITION, String.valueOf(rowData.getNextPosition()));
     }
 
-    /**
-     * 校验是否可以收集
-     *
-     * @param type 事件类型
-     * @return boolean true 可以 false 不可以
-     * @author nza
-     * @createTime 2020/12/21 14:34
-     */
-    private boolean canCollection(EventType type) {
-        // 如果不是更新、插入、删除事件, 直接忽略即可
-        if (!ALLOW_COLLECTION_TYPES.contains(type)) {
-            return false;
-        }
-
-        // 表名和库名是否已经完成填充
-        if (StringUtils.isEmpty(dbName) || StringUtils.isEmpty(tableName)) {
-            log.error("no meta data event");
-            return false;
-        }
-
-        // 是否在数据库白名单中
-        if (!ALLOW_COLLECTION_SCHEMAS.contains(dbName)) {
-            return false;
-        }
-
-        // 是否在数据库表白名单中
-        return ALLOW_COLLECTION_TABLES.contains(tableName);
-    }
 
     /**
      * 构建行数据
      *
      * @param data 事件
-     * @return {@link BinlogRowDataDTO} 行数据
+     * @return {@link BinlogRowDataBO} 行数据
      * @author nza
      * @createTime 2020/12/21 14:28
      */
-    private BinlogRowDataDTO buildRowData(EventData data, EventType eventType, Map<Integer, String> dbPosMap) throws Exception {
+    private BinlogRowDataBO buildRowData(EventData data, BinlogRowDataBO rowDataBO, Map<Integer, String> dbPosMap) throws Exception {
 
-        BinlogRowDataDTO binlogRowDataDTO = new BinlogRowDataDTO();
-        List<String> primaryKeys = getPrimaryKeys(dbName, tableName);
+        List<String> primaryKeys = getPrimaryKeys(rowDataBO.getSchemaName(), rowDataBO.getTableName());
         List<Map<String, String>> after = Lists.newArrayList();
         List<Map<String, String>> before = Lists.newArrayList();
 
-        switch (eventType) {
+        switch (rowDataBO.getEventType()) {
             case EXT_WRITE_ROWS:
                 processWriteRows((WriteRowsEventData) data, dbPosMap, after);
                 break;
@@ -260,17 +187,14 @@ public class DataCollectionServiceImpl implements DataCollectionService {
                 processDeleteRows((DeleteRowsEventData) data, dbPosMap, after);
                 break;
             default:
-                throw new Exception("非法的数据行类型: " + eventType.name());
+                throw new Exception("非法的数据行类型: " + rowDataBO.getEventType().name());
         }
 
-        binlogRowDataDTO.setPrimaryKeys(primaryKeys)
-                .setSchemaName(dbName)
-                .setTableName(tableName)
+        rowDataBO.setPrimaryKeys(primaryKeys)
                 .setAfter(after)
-                .setBefore(before)
-                .setEventType(eventType);
+                .setBefore(before);
 
-        return binlogRowDataDTO;
+        return rowDataBO;
     }
 
     /**
@@ -338,7 +262,7 @@ public class DataCollectionServiceImpl implements DataCollectionService {
         if (item == null) {
             return null;
         }
-        if (NORMAL_TYPE.contains(item.getClass())) {
+        if (EventConst.NORMAL_TYPE.contains(item.getClass())) {
             return String.valueOf(item);
         }
         if (item instanceof Boolean) {
@@ -381,12 +305,17 @@ public class DataCollectionServiceImpl implements DataCollectionService {
      * @author nza
      * @createTime 2020/12/21 14:26
      */
-    private void optionTableInfo(Event event, EventType type) {
+    private BinlogRowDataBO initRowData(Event event, EventType type) {
         // 如果是 TABLE_MAP 事件，可以从中获取到操作的库名和表名
         if (type == EventType.TABLE_MAP) {
+            BinlogRowDataBO rowData = new BinlogRowDataBO();
             TableMapEventData data = event.getData();
-            tableName = data.getTable();
-            dbName = data.getDatabase();
+            rowData.setOriginTableName(data.getTable());
+            rowData.setOriginDataBase(data.getDatabase());
+            rowData.setEventType(type);
+            return rowData;
+        } else {
+            return new BinlogRowDataBO();
         }
     }
 
@@ -395,7 +324,7 @@ public class DataCollectionServiceImpl implements DataCollectionService {
 
         Map<Integer, String> posMap = Maps.newHashMap();
 
-        jdbcTemplate.query(SQL_SCHEMA, new String[]{schema, tableName}, (rs, i) -> {
+        jdbcTemplate.query(EventConst.SQL_SCHEMA, new String[]{schema, tableName}, (rs, i) -> {
             int pos = rs.getInt("ORDINAL_POSITION");
             String colName = rs.getString("COLUMN_NAME");
 
@@ -408,9 +337,8 @@ public class DataCollectionServiceImpl implements DataCollectionService {
 
     @Override
     public List<String> getPrimaryKeys(String schema, String tableName) {
-
         List<String> primaryKeys = Lists.newArrayList();
-        jdbcTemplate.query(SQL_PRIMARY_SCHEMA, new String[]{schema, tableName}, (rs, i) -> {
+        jdbcTemplate.query(EventConst.SQL_PRIMARY_SCHEMA, new String[]{schema, tableName}, (rs, i) -> {
             String columnName = rs.getString("column_name");
             if (!StringUtils.isEmpty(columnName)) {
                 primaryKeys.add(columnName);
